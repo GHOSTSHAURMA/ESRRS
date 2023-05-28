@@ -4,7 +4,7 @@ Energy-saving refresh rate switch
 A small util for laptops and such. Automatically switches between two refresh rates based on if the power cable is connected or not.
 
 ## Usage
-Even though it's usable, the util may have a lot of bugs so i don't take any resposobility for but if u think it's good enough:  
+Even though it's usable, the util may have a lot of bugs so i don't take any resposobility for what may happen but if u think it's good enough:  
 1. Download the code  
 2. Alter the variables for battery(batteryRR) and ac-powered(lineRR) refresh rates (in hertz) in App.cpp
 3. Compile
