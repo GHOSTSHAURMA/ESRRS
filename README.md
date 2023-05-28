@@ -7,6 +7,6 @@ A small util for laptops and such. Automatically switches between two refresh ra
 To be added (As soon as a make it usable).
 
 ## Work in progress
--Tray notification 
--Refactor code 
+-Tray notification  
+-Refactor code  
 -Settings window 
