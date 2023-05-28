@@ -1,9 +1,13 @@
 #include <Windows.h>
 #include <iostream>
+#include "resource.h"
 
 using namespace std;
 
 const int batteryRR = 60, lineRR = 165;
+HICON icon_battery_full, icon_plug;
+NOTIFYICONDATAA iconData = { };
+HMENU icon_popup_menu;
 
 void changeDisplaySettings(DEVMODE dm, DWORD old = 0)
 {
@@ -39,6 +43,15 @@ void changeDisplaySettings(DEVMODE dm, DWORD old = 0)
         MessageBox(NULL, L"Unknown error", L"ERROR", NULL);
         break;
     }
+}
+
+void updateIcon(HWND hWnd)
+{
+    SYSTEM_POWER_STATUS powerStatus;
+    GetSystemPowerStatus(&powerStatus);
+    iconData.hIcon = powerStatus.ACLineStatus == 1 ? icon_plug : icon_battery_full;
+
+    Shell_NotifyIconA(NIM_MODIFY, &iconData);
 }
 
 void checkPoverAndSwitch()
@@ -80,6 +93,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
     case WM_POWERBROADCAST:
     {
         checkPoverAndSwitch();
+        updateIcon(hWnd);
         break;
     }
     case WM_DESTROY: 
@@ -87,15 +101,64 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
         PostQuitMessage(0);
         break;
     }
+    case WM_COMMAND:
+    {
+        switch (wParam)
+        {
+        case ID_ICON_CLOSE:
+        {
+            DestroyWindow(hWnd);
+
+            break;
+        }
+        case ID_ICON_SETTINGS:
+        {
+            MessageBox(hWnd, L"To be implemented.", L"Settings", NULL);
+
+            break;
+        }
+        default:
+            break;
+        }
+
+        break;
+    }
+    case WM_USER:
+    {
+        switch (LOWORD(lParam))
+        {
+        case WM_RBUTTONUP:
+        {
+            POINT pt;
+            GetCursorPos(&pt);
+            icon_popup_menu = GetSubMenu(LoadMenuA((HINSTANCE)GetWindowLongA(hWnd, GWL_HINSTANCE), MAKEINTRESOURCEA(IDR_MENU_ICON)), 0);
+
+            TPMPARAMS tpmp = {};
+            tpmp.cbSize = sizeof(tpmp);
+            tpmp.rcExclude = { 0, 0, 0, 0 };
+
+            TrackPopupMenuEx(icon_popup_menu, TPM_LEFTALIGN | TPM_LEFTBUTTON | TPM_BOTTOMALIGN, pt.x, pt.y, hWnd, &tpmp);
+
+            break;
+        }
+        default:
+            break;
+        }
+    }
     }
 
-    return DefWindowProc(hWnd, message, wParam, lParam);
+    return DefWindowProcA(hWnd, message, wParam, lParam);
 }
 
-int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nCmdShow)
+int WINAPI WinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance, _In_  LPSTR lpCmdLine, _In_  int nCmdShow)
 {
+    int lastError;
+    icon_battery_full = LoadIconA(hInstance, MAKEINTRESOURCEA(IDI_BATTERY_FULL));
+    icon_plug = LoadIconA(hInstance, MAKEINTRESOURCEA(IDI_PLUG));
+
     MSG msg;
-    WNDCLASS wc = { 0 };
+    WNDCLASSEX wc = { 0 };
+    wc.cbSize = sizeof(wc);
     wc.cbClsExtra = 0;
     wc.cbWndExtra = 0;
     wc.lpszClassName = L"ESRRS";
@@ -103,9 +166,8 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
     wc.hbrBackground = GetSysColorBrush(COLOR_3DFACE);
     wc.lpfnWndProc = WndProc;
 
-
-    RegisterClass(&wc);
-    HWND hWnd = CreateWindowW(wc.lpszClassName, L"ESRRS", WS_OVERLAPPED | WS_MINIMIZEBOX, CW_USEDEFAULT, CW_USEDEFAULT, 600, 300, NULL, NULL, hInstance, NULL);
+    RegisterClassEx(&wc);
+    HWND hWnd = CreateWindowEx(0, wc.lpszClassName, L"ESRRS", WS_OVERLAPPED | WS_MINIMIZEBOX, CW_USEDEFAULT, CW_USEDEFAULT, 600, 300, NULL, NULL, hInstance, NULL);
 
     if (!hWnd)
     {
@@ -121,13 +183,19 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
     // Add settings later
     // ShowWindow(hWnd, SHOW_OPENWINDOW);
 
-    NOTIFYICONDATAA nid = {};
-    nid.cbSize = sizeof(nid);
-    nid.hWnd = hWnd;
-    nid.uFlags = NIF_TIP;
-    memcpy(nid.szTip, "ESRRS\nEnergy-saving refresh rate switch", 128);
+    iconData.cbSize = sizeof(iconData);
+    iconData.hWnd = hWnd;
+    iconData.uCallbackMessage = WM_USER;
+    iconData.uVersion = NOTIFYICON_VERSION_4;
+    iconData.uFlags = NIF_TIP | NIF_MESSAGE | NIF_ICON;
+    
+    SYSTEM_POWER_STATUS powerStatus;
+    GetSystemPowerStatus(&powerStatus);
+    iconData.hIcon = powerStatus.ACLineStatus == 1? icon_plug : icon_battery_full;
 
-    Shell_NotifyIconA(NIM_ADD, &nid);
+    memcpy(iconData.szTip, "ESRRS\nEnergy-saving refresh rate switch", 40);
+
+    Shell_NotifyIconA(NIM_ADD, &iconData);
 
     UpdateWindow(hWnd);
 
@@ -137,7 +205,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
         DispatchMessage(&msg);
     }
 
-    Shell_NotifyIconA(NIM_DELETE, &nid);
+    Shell_NotifyIconA(NIM_DELETE, &iconData);
 
     return (int)msg.wParam;
 }
